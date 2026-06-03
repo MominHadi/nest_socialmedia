@@ -1,0 +1,127 @@
+generator client {
+  // provider     = "prisma-client"
+  // output       = "../generated/prisma"
+  // moduleFormat = "cjs"
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  email           String    @unique
+  isEmailVerified Boolean   @default(false)
+  name            String?
+  password        String
+  otp             String?
+  otpExpiresAt    DateTime?
+  profileUrl      String?
+  bio             String?   @db.Text
+  lastLogin       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  status          Int       @default(1)
+  posts           Post[]
+  comments        Comment[]
+  likes           Like[]
+
+    // Users who follow this user
+  followers       Follow[]   @relation("UserFollowers")
+
+  // Users whom this user follows
+  following       Follow[]   @relation("UserFollowing")
+}
+
+model Post {
+  id        Int         @id @default(autoincrement())
+  location  String?
+  caption   String?     @db.Text
+  authorId  Int
+  author    User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  status    Int         @default(1)
+  comments  Comment[]
+  likes     Like[]
+  media     PostMedia[] // ← replaces fileType, fileUrl, fileSize
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model PostMedia {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  fileType  String?
+  fileUrl   String
+  fileSize  String?
+  order     Int      @default(0) // ← controls display order (carousel position)
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@index([postId, order])
+}
+
+
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  status    Int      @default(1)
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  status    Int      @default(1)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+
+model Follow {
+  id           Int      @id @default(autoincrement())
+
+  followerId   Int
+  followingId  Int
+
+  // The user who is following someone
+  follower     User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+
+  // The user being followed
+  following    User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  status       Int      @default(1)
+
+  // Prevent duplicate follow
+  @@unique([followerId, followingId])
+
+  // For performance
+  @@index([followerId])
+  @@index([followingId])
+
+  // Prevent user following themselves
+  @@map("follows")
+}
